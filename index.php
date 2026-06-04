@@ -1201,7 +1201,7 @@ echo '</style>';
 											<div style="font-size: 0.72rem;color: #888;padding-top: 6px;line-height: 1.3;">
 												A separate password used only for registering SIP endpoints &mdash; it does <b>not</b> change the softphone's SIP registration password. Its length must match the connection's "Terminal password length" (Connection settings &rarr; Miscellaneous).
 											</div>
-											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${userid || ''}" style="margin-top: 8px;width: 100%;">
+											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${id || ''}" style="margin-top: 8px;width: 100%;">
 												<span id="set_termpass_text_${id}" class="set_termpass_text">Set Terminal Password</span>
 												<span id="set_termpass_loading_${id}" class="set_termpass_loading" style="display: none;">
 													<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
@@ -1394,7 +1394,9 @@ echo '</style>';
 		$(`.set_termpass_button`).on('click', (function (el) {
 			const id = el.currentTarget.id.split('_').pop();
 			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
-			const userid = $(el.currentTarget).attr('data-userid');
+			// getSIPCredentials' "userid" is the user's Ringotel id (the same id used by
+			// reset/update/delete). The linked-account "userid" field is often empty.
+			const userid = $(el.currentTarget).attr('data-userid') || id;
 			const protocol = $('#termpass_protocol_ec_input_' + id).val();
 			const termpass = $('#terminal_password_ec_input_' + id).val();
 
