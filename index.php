@@ -1201,8 +1201,41 @@ echo '</style>';
 													Setting...
 												</span>
 											</button>
-											<div id="termpass_server_ec_${id}" style="display: none;font-size: 0.78rem;padding-top: 8px;word-break: break-all;">
-												Server: <span id="termpass_server_value_${id}"></span>
+											<div id="termpass_result_ec_${id}" class="termpass_result_ec" style="display: none;margin-top: 12px;padding: 10px 12px;border: 1px solid #e0e0e0;border-radius: 4px;background: #f8f9fa;">
+												<div style="font-weight: 600;font-size: 0.8rem;margin-bottom: 8px;color: #333;">SIP registration credentials</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">Server</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_server_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_server_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">SIP username</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_username_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_username_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">Auth name</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_authname_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_authname_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">Password</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_password_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i id="termpass_reveal_${id}" class="fa fa-eye termpass_reveal" data-reveal-target="termpass_password_value_${id}" title="Show/Hide" style="cursor: pointer;color: #888;flex: 0 0 auto;"></i>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_password_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
 											</div>
 										</div>
 
@@ -1395,10 +1428,17 @@ echo '</style>';
 							$('#auth_name_ec_input_' + id).val(result.authname);
 							$('#auth_name_ec_input_text_' + id).css('opacity', 1);
 						}
-						if (result.server) {
-							$('#termpass_server_value_' + id).text(result.server);
-							$('#termpass_server_ec_' + id).fadeIn(300);
-						}
+						// Populate the readable / copyable credentials panel
+						$('#termpass_server_value_' + id).text(result.server || '');
+						$('#termpass_username_value_' + id).text(result.username || '');
+						$('#termpass_authname_value_' + id).text(result.authname || '');
+						// keep the password masked until revealed; real value lives in data-secret
+						$('#termpass_password_value_' + id)
+							.attr('data-secret', result.password || '')
+							.removeClass('revealed')
+							.text(result.password ? '••••••••••••' : '');
+						$('#termpass_reveal_' + id).removeClass('fa-eye-slash').addClass('fa-eye');
+						$('#termpass_result_ec_' + id).fadeIn(300);
 					}
 					$('#set_termpass_loading_' + id).hide();
 					$('#set_termpass_text_' + id).show();
@@ -1410,6 +1450,55 @@ echo '</style>';
 					$('#set_termpass_button_' + id).attr('disabled', false);
 				}
 			});
+		}));
+
+		// Reveal / hide the terminal password in the credentials panel
+		$(`.termpass_reveal`).on('click', (function (el) {
+			const icon = el.currentTarget;
+			const $val = $('#' + $(icon).attr('data-reveal-target'));
+			const secret = $val.attr('data-secret') || '';
+			if ($val.hasClass('revealed')) {
+				$val.removeClass('revealed').text(secret ? '••••••••••••' : '');
+				$(icon).removeClass('fa-eye-slash').addClass('fa-eye');
+			} else {
+				$val.addClass('revealed').text(secret);
+				$(icon).removeClass('fa-eye').addClass('fa-eye-slash');
+			}
+		}));
+
+		// Copy a credential value to the clipboard
+		const termpassFallbackCopy = (text, onDone) => {
+			const ta = document.createElement('textarea');
+			ta.value = text;
+			ta.style.position = 'fixed';
+			ta.style.opacity = '0';
+			document.body.appendChild(ta);
+			ta.focus();
+			ta.select();
+			try { document.execCommand('copy'); } catch (e) {}
+			document.body.removeChild(ta);
+			if (typeof onDone === 'function') onDone();
+		};
+		$(`.termpass_copy`).on('click', (function (el) {
+			const icon = el.currentTarget;
+			const $val = $('#' + $(icon).attr('data-copy-target'));
+			// prefer the real password (data-secret) over masked display text
+			const text = $val.attr('data-secret') || $val.text();
+			if (!text) return;
+			const flash = () => {
+				const original = icon.className;
+				icon.className = 'fa fa-check termpass_copy';
+				$(icon).css('color', '#28a745');
+				setTimeout(() => {
+					icon.className = original;
+					$(icon).css('color', '#2196f3');
+				}, 1200);
+			};
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(text).then(flash).catch(() => termpassFallbackCopy(text, flash));
+			} else {
+				termpassFallbackCopy(text, flash);
+			}
 		}));
 	};
 
