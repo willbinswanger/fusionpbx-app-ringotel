@@ -1122,7 +1122,7 @@ echo '</style>';
 <script>
 	let ORG_ID = '';
 	////// Edit User MODAL //////
-	const modalEditUser = ({ id, accountid, domain, name, email, extension, sip_password, sip_username, auth_name, mobile, created }) => {
+	const modalEditUser = ({ id, accountid, userid, domain, name, email, extension, sip_password, sip_username, auth_name, mobile, created }) => {
 		return (
 			`
 			<div class="modal hide fade" id="editUserModal_${id}" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel_${id}" aria-hidden="true" style="display: none;">
@@ -1180,6 +1180,63 @@ echo '</style>';
 												Authorization name
 											</div>
 											  <input id="auth_name_ec_input_${id}" name="auth_name_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" type="text" class="form-control auth_name_ec_input" placeholder="Authorization name" aria-label="Authorization name" value="${auth_name || ''}">
+										</div>
+
+										<div id="termpass_ec_${id}" class="termpass_ec paddingBottomEc">
+											<div id="termpass_protocol_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
+												SIP transport protocol
+											</div>
+											<select id="termpass_protocol_ec_input_${id}" name="termpass_protocol_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" class="form-control termpass_protocol_ec_input" aria-label="SIP transport protocol">
+												<option value="sip">SIP (UDP)</option>
+												<option value="sip-tcp">SIP (TCP)</option>
+												<option value="sips">SIP (TLS/SRTP)</option>
+											</select>
+											<div style="font-size: 0.72rem;color: #888;padding-top: 6px;line-height: 1.3;">
+												Type a value in <b>SIP password</b> above, then set it as the terminal password for registering SIP endpoints. The length must match the connection's "Terminal password length" (Connection settings &rarr; Miscellaneous).
+											</div>
+											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${userid || ''}" style="margin-top: 8px;width: 100%;">
+												<span id="set_termpass_text_${id}" class="set_termpass_text">Set Terminal Password</span>
+												<span id="set_termpass_loading_${id}" class="set_termpass_loading" style="display: none;">
+													<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
+													Setting...
+												</span>
+											</button>
+											<div id="termpass_result_ec_${id}" class="termpass_result_ec" style="display: none;margin-top: 12px;padding: 10px 12px;border: 1px solid #e0e0e0;border-radius: 4px;background: #f8f9fa;">
+												<div style="font-weight: 600;font-size: 0.8rem;margin-bottom: 8px;color: #333;">SIP registration credentials</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">Server</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_server_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_server_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">SIP username</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_username_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_username_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">Auth name</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_authname_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_authname_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+
+												<div style="display: flex;align-items: center;justify-content: space-between;gap: 8px;padding: 4px 0;font-size: 0.8rem;">
+													<span style="color: #777;flex: 0 0 auto;">Password</span>
+													<span style="display: flex;align-items: center;gap: 8px;min-width: 0;">
+														<span id="termpass_password_value_${id}" style="font-family: monospace;word-break: break-all;text-align: right;"></span>
+														<i id="termpass_reveal_${id}" class="fa fa-eye termpass_reveal" data-reveal-target="termpass_password_value_${id}" title="Show/Hide" style="cursor: pointer;color: #888;flex: 0 0 auto;"></i>
+														<i class="fa fa-copy termpass_copy" data-copy-target="termpass_password_value_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+													</span>
+												</div>
+											</div>
 										</div>
 
 										<div id="mobile_ec_${id}" class="mobile_ec paddingBottomEc">
@@ -1317,6 +1374,131 @@ echo '</style>';
 			// console.log('--> [edit_user_button] --> data', data);
 
 			saveEditedUser(id, data);
+		}));
+
+		// SET TERMINAL PASSWORD (Ringotel getSIPCredentials)
+		$(`.set_termpass_button`).on('click', (function (el) {
+			const id = el.currentTarget.id.split('_').pop();
+			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
+			const userid = $(el.currentTarget).attr('data-userid');
+			const protocol = $('#termpass_protocol_ec_input_' + id).val();
+			const termpass = $('#sip_password_ec_input_' + id).val();
+
+			// We must have the Ringotel user id to set credentials
+			if (!userid) {
+				$('#error_message').fadeIn(300);
+				$('#error_message_text').text('Missing Ringotel user id for this contact.');
+				return;
+			}
+
+			// Manual entry only: a SIP password is required
+			if (!termpass || !termpass.trim()) {
+				$('#sip_password_ec_input_' + id).addClass('alert-danger');
+				$('#error_message').fadeIn(300);
+				$('#error_message_text').text('Enter a SIP password to set as the terminal password.');
+				return;
+			}
+			$('#sip_password_ec_input_' + id).removeClass('alert-danger');
+
+			const data = { orgid, userid, protocol, termpass };
+
+			$('#set_termpass_button_' + id).attr('disabled', true);
+			$('#set_termpass_text_' + id).hide();
+			$('#set_termpass_loading_' + id).show();
+
+			$.ajax({
+				url: "/app/<?php echo $application_directory ?>/service.php?method=get_sip_credentials",
+				type: "post",
+				cache: false,
+				data,
+				success: function (response) {
+					checkErrors(response);
+					const parsed = parseJson(response);
+					const result = parsed?.result;
+					if (result) {
+						if (result.password) {
+							$('#sip_password_ec_input_' + id).val(result.password);
+							$('#sip_password_ec_input_text_' + id).css('opacity', 1);
+						}
+						if (result.username) {
+							$('#sip_username_ec_input_' + id).val(result.username);
+							$('#sip_username_ec_input_text_' + id).css('opacity', 1);
+						}
+						if (result.authname) {
+							$('#auth_name_ec_input_' + id).val(result.authname);
+							$('#auth_name_ec_input_text_' + id).css('opacity', 1);
+						}
+						// Populate the readable / copyable credentials panel
+						$('#termpass_server_value_' + id).text(result.server || '');
+						$('#termpass_username_value_' + id).text(result.username || '');
+						$('#termpass_authname_value_' + id).text(result.authname || '');
+						// keep the password masked until revealed; real value lives in data-secret
+						$('#termpass_password_value_' + id)
+							.attr('data-secret', result.password || '')
+							.removeClass('revealed')
+							.text(result.password ? '••••••••••••' : '');
+						$('#termpass_reveal_' + id).removeClass('fa-eye-slash').addClass('fa-eye');
+						$('#termpass_result_ec_' + id).fadeIn(300);
+					}
+					$('#set_termpass_loading_' + id).hide();
+					$('#set_termpass_text_' + id).show();
+					$('#set_termpass_button_' + id).attr('disabled', false);
+				},
+				error: function (jqXHR, textStatus, errorThrown) {
+					$('#set_termpass_loading_' + id).hide();
+					$('#set_termpass_text_' + id).show();
+					$('#set_termpass_button_' + id).attr('disabled', false);
+				}
+			});
+		}));
+
+		// Reveal / hide the terminal password in the credentials panel
+		$(`.termpass_reveal`).on('click', (function (el) {
+			const icon = el.currentTarget;
+			const $val = $('#' + $(icon).attr('data-reveal-target'));
+			const secret = $val.attr('data-secret') || '';
+			if ($val.hasClass('revealed')) {
+				$val.removeClass('revealed').text(secret ? '••••••••••••' : '');
+				$(icon).removeClass('fa-eye-slash').addClass('fa-eye');
+			} else {
+				$val.addClass('revealed').text(secret);
+				$(icon).removeClass('fa-eye').addClass('fa-eye-slash');
+			}
+		}));
+
+		// Copy a credential value to the clipboard
+		const termpassFallbackCopy = (text, onDone) => {
+			const ta = document.createElement('textarea');
+			ta.value = text;
+			ta.style.position = 'fixed';
+			ta.style.opacity = '0';
+			document.body.appendChild(ta);
+			ta.focus();
+			ta.select();
+			try { document.execCommand('copy'); } catch (e) {}
+			document.body.removeChild(ta);
+			if (typeof onDone === 'function') onDone();
+		};
+		$(`.termpass_copy`).on('click', (function (el) {
+			const icon = el.currentTarget;
+			const $val = $('#' + $(icon).attr('data-copy-target'));
+			// prefer the real password (data-secret) over masked display text
+			const text = $val.attr('data-secret') || $val.text();
+			if (!text) return;
+			const flash = () => {
+				const original = icon.className;
+				icon.className = 'fa fa-check termpass_copy';
+				$(icon).css('color', '#28a745');
+				setTimeout(() => {
+					icon.className = original;
+					$(icon).css('color', '#2196f3');
+				}, 1200);
+			};
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(text).then(flash).catch(() => termpassFallbackCopy(text, flash));
+			} else {
+				termpassFallbackCopy(text, flash);
+			}
 		}));
 	};
 
@@ -2671,6 +2853,7 @@ echo '</style>';
 			const userModalData = {
 				id,
 				accountid: orgid,
+				userid: other?.userid || '',
 				domain,
 				name,
 				email: other?.info?.email || '',
