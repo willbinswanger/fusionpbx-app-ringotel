@@ -308,6 +308,28 @@ class ringotel_api_functions {
 	}
 
 	/**
+	 * Create/Set Terminal Password (SIP credentials) for registering SIP endpoints
+	 * @param array $param
+	 * @return array JSON decoded string to an associative array
+	 */
+	public function get_sip_credentials(array $param) {
+		$params = array(
+			"orgid" => $param['orgid'],
+			"userid" => $param['userid'],
+			"protocol" => !empty($param['protocol']) ? $param['protocol'] : 'sip'
+		);
+		// termpass [optional] - skip to let Ringotel generate one
+		if (!empty($param['termpass'])) {
+			$params['termpass'] = $param['termpass'];
+		}
+		$parameters = array(
+			"method" => "getSIPCredentials",
+			"params" => $params
+		);
+		return $this->ringotel_middleware_manager->handle($this->curl->post($this->baseUrl, $parameters));
+	}
+
+	/**
 	 * GET USERS
 	 * @param array $params
 	 * @return string

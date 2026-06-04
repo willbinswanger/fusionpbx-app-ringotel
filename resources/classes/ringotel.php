@@ -479,6 +479,27 @@ class ringotel {
 	}
 
 	/**
+	 * SET TERMINAL PASSWORD
+	 * Create/set the SIP terminal password for registering SIP endpoints
+	 */
+	public function get_sip_credentials($queryParams) {
+		$param = array();
+
+		// Default param
+		$param["orgid"] = $queryParams['orgid'];
+		$param["userid"] = $queryParams['userid'];
+		$param["protocol"] = !empty($queryParams['protocol']) ? $queryParams['protocol'] : 'sip';
+
+		// termpass [optional] - skip to let Ringotel generate one
+		if (!empty($queryParams['termpass'])) {
+			$param["termpass"] = $queryParams['termpass'];
+		}
+
+		//main
+		return $this->api->get_sip_credentials($param);
+	}
+
+	/**
 	 * ACTIVATE USER
 	 */
 	public function activate_user($queryParams) {

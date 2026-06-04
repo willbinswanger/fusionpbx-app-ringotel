@@ -1122,7 +1122,7 @@ echo '</style>';
 <script>
 	let ORG_ID = '';
 	////// Edit User MODAL //////
-	const modalEditUser = ({ id, accountid, domain, name, email, extension, sip_password, sip_username, auth_name, mobile, created }) => {
+	const modalEditUser = ({ id, accountid, userid, domain, name, email, extension, sip_password, sip_username, auth_name, mobile, created }) => {
 		return (
 			`
 			<div class="modal hide fade" id="editUserModal_${id}" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel_${id}" aria-hidden="true" style="display: none;">
@@ -1180,6 +1180,30 @@ echo '</style>';
 												Authorization name
 											</div>
 											  <input id="auth_name_ec_input_${id}" name="auth_name_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" type="text" class="form-control auth_name_ec_input" placeholder="Authorization name" aria-label="Authorization name" value="${auth_name || ''}">
+										</div>
+
+										<div id="termpass_ec_${id}" class="termpass_ec paddingBottomEc">
+											<div id="termpass_protocol_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
+												SIP transport protocol
+											</div>
+											<select id="termpass_protocol_ec_input_${id}" name="termpass_protocol_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" class="form-control termpass_protocol_ec_input" aria-label="SIP transport protocol">
+												<option value="sip">SIP (UDP)</option>
+												<option value="sip-tcp">SIP (TCP)</option>
+												<option value="sips">SIP (TLS/SRTP)</option>
+											</select>
+											<div style="font-size: 0.72rem;color: #888;padding-top: 6px;line-height: 1.3;">
+												Type a value in <b>SIP password</b> above, then set it as the terminal password for registering SIP endpoints. The length must match the connection's "Terminal password length" (Connection settings &rarr; Miscellaneous).
+											</div>
+											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${userid || ''}" style="margin-top: 8px;width: 100%;">
+												<span id="set_termpass_text_${id}" class="set_termpass_text">Set Terminal Password</span>
+												<span id="set_termpass_loading_${id}" class="set_termpass_loading" style="display: none;">
+													<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
+													Setting...
+												</span>
+											</button>
+											<div id="termpass_server_ec_${id}" style="display: none;font-size: 0.78rem;padding-top: 8px;word-break: break-all;">
+												Server: <span id="termpass_server_value_${id}"></span>
+											</div>
 										</div>
 
 										<div id="mobile_ec_${id}" class="mobile_ec paddingBottomEc">
@@ -1317,6 +1341,75 @@ echo '</style>';
 			// console.log('--> [edit_user_button] --> data', data);
 
 			saveEditedUser(id, data);
+		}));
+
+		// SET TERMINAL PASSWORD (Ringotel getSIPCredentials)
+		$(`.set_termpass_button`).on('click', (function (el) {
+			const id = el.currentTarget.id.split('_').pop();
+			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
+			const userid = $(el.currentTarget).attr('data-userid');
+			const protocol = $('#termpass_protocol_ec_input_' + id).val();
+			const termpass = $('#sip_password_ec_input_' + id).val();
+
+			// We must have the Ringotel user id to set credentials
+			if (!userid) {
+				$('#error_message').fadeIn(300);
+				$('#error_message_text').text('Missing Ringotel user id for this contact.');
+				return;
+			}
+
+			// Manual entry only: a SIP password is required
+			if (!termpass || !termpass.trim()) {
+				$('#sip_password_ec_input_' + id).addClass('alert-danger');
+				$('#error_message').fadeIn(300);
+				$('#error_message_text').text('Enter a SIP password to set as the terminal password.');
+				return;
+			}
+			$('#sip_password_ec_input_' + id).removeClass('alert-danger');
+
+			const data = { orgid, userid, protocol, termpass };
+
+			$('#set_termpass_button_' + id).attr('disabled', true);
+			$('#set_termpass_text_' + id).hide();
+			$('#set_termpass_loading_' + id).show();
+
+			$.ajax({
+				url: "/app/<?php echo $application_directory ?>/service.php?method=get_sip_credentials",
+				type: "post",
+				cache: false,
+				data,
+				success: function (response) {
+					checkErrors(response);
+					const parsed = parseJson(response);
+					const result = parsed?.result;
+					if (result) {
+						if (result.password) {
+							$('#sip_password_ec_input_' + id).val(result.password);
+							$('#sip_password_ec_input_text_' + id).css('opacity', 1);
+						}
+						if (result.username) {
+							$('#sip_username_ec_input_' + id).val(result.username);
+							$('#sip_username_ec_input_text_' + id).css('opacity', 1);
+						}
+						if (result.authname) {
+							$('#auth_name_ec_input_' + id).val(result.authname);
+							$('#auth_name_ec_input_text_' + id).css('opacity', 1);
+						}
+						if (result.server) {
+							$('#termpass_server_value_' + id).text(result.server);
+							$('#termpass_server_ec_' + id).fadeIn(300);
+						}
+					}
+					$('#set_termpass_loading_' + id).hide();
+					$('#set_termpass_text_' + id).show();
+					$('#set_termpass_button_' + id).attr('disabled', false);
+				},
+				error: function (jqXHR, textStatus, errorThrown) {
+					$('#set_termpass_loading_' + id).hide();
+					$('#set_termpass_text_' + id).show();
+					$('#set_termpass_button_' + id).attr('disabled', false);
+				}
+			});
 		}));
 	};
 
@@ -2671,6 +2764,7 @@ echo '</style>';
 			const userModalData = {
 				id,
 				accountid: orgid,
+				userid: other?.userid || '',
 				domain,
 				name,
 				email: other?.info?.email || '',
