@@ -1183,6 +1183,13 @@ echo '</style>';
 										</div>
 
 										<div id="termpass_ec_${id}" class="termpass_ec paddingBottomEc">
+											<div style="font-weight: 600;font-size: 0.8rem;margin-bottom: 6px;color: #333;">Terminal password</div>
+											<div id="terminal_password_ec_${id}" class="terminal_password_ec paddingBottomEc">
+												<div id="terminal_password_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;opacity: 0;">
+													Terminal password
+												</div>
+												<input id="terminal_password_ec_input_${id}" name="terminal_password_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" type="password" autocomplete="new-password" class="form-control terminal_password_ec_input" placeholder="Terminal password" aria-label="Terminal password" value="">
+											</div>
 											<div id="termpass_protocol_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
 												SIP transport protocol
 											</div>
@@ -1192,7 +1199,7 @@ echo '</style>';
 												<option value="sips">SIP (TLS/SRTP)</option>
 											</select>
 											<div style="font-size: 0.72rem;color: #888;padding-top: 6px;line-height: 1.3;">
-												Type a value in <b>SIP password</b> above, then set it as the terminal password for registering SIP endpoints. The length must match the connection's "Terminal password length" (Connection settings &rarr; Miscellaneous).
+												A separate password used only for registering SIP endpoints &mdash; it does <b>not</b> change the softphone's SIP registration password. Its length must match the connection's "Terminal password length" (Connection settings &rarr; Miscellaneous).
 											</div>
 											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${userid || ''}" style="margin-top: 8px;width: 100%;">
 												<span id="set_termpass_text_${id}" class="set_termpass_text">Set Terminal Password</span>
@@ -1201,6 +1208,7 @@ echo '</style>';
 													Setting...
 												</span>
 											</button>
+											<div id="termpass_message_${id}" style="display: none;font-size: 0.78rem;padding-top: 8px;line-height: 1.3;"></div>
 											<div id="termpass_result_ec_${id}" class="termpass_result_ec" style="display: none;margin-top: 12px;padding: 10px 12px;border: 1px solid #e0e0e0;border-radius: 4px;background: #f8f9fa;">
 												<div style="font-weight: 600;font-size: 0.8rem;margin-bottom: 8px;color: #333;">SIP registration credentials</div>
 
@@ -1376,29 +1384,40 @@ echo '</style>';
 			saveEditedUser(id, data);
 		}));
 
+		// Terminal password field label opacity (match the other fields)
+		$(`.terminal_password_ec_input`).on('keyup', (function (el) {
+			const id = el.target.id.split('_').pop();
+			$(`#terminal_password_ec_input_text_${id}`).css('opacity', el.target.value.trim() ? 1 : 0);
+		}));
+
 		// SET TERMINAL PASSWORD (Ringotel getSIPCredentials)
 		$(`.set_termpass_button`).on('click', (function (el) {
 			const id = el.currentTarget.id.split('_').pop();
 			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
 			const userid = $(el.currentTarget).attr('data-userid');
 			const protocol = $('#termpass_protocol_ec_input_' + id).val();
-			const termpass = $('#sip_password_ec_input_' + id).val();
+			const termpass = $('#terminal_password_ec_input_' + id).val();
+
+			// inline feedback inside the modal (the page-level alert sits behind it)
+			const showMessage = (text, ok) => {
+				$('#termpass_message_' + id).css('color', ok ? '#28a745' : '#c31919').text(text).show();
+			};
+			$('#termpass_message_' + id).hide().text('');
+			$('#termpass_result_ec_' + id).hide();
 
 			// We must have the Ringotel user id to set credentials
 			if (!userid) {
-				$('#error_message').fadeIn(300);
-				$('#error_message_text').text('Missing Ringotel user id for this contact.');
+				showMessage('Missing Ringotel user id for this contact. The user may need to be activated first.', false);
 				return;
 			}
 
-			// Manual entry only: a SIP password is required
+			// Manual entry only: a terminal password is required
 			if (!termpass || !termpass.trim()) {
-				$('#sip_password_ec_input_' + id).addClass('alert-danger');
-				$('#error_message').fadeIn(300);
-				$('#error_message_text').text('Enter a SIP password to set as the terminal password.');
+				$('#terminal_password_ec_input_' + id).addClass('alert-danger');
+				showMessage('Enter a terminal password to set.', false);
 				return;
 			}
-			$('#sip_password_ec_input_' + id).removeClass('alert-danger');
+			$('#terminal_password_ec_input_' + id).removeClass('alert-danger');
 
 			const data = { orgid, userid, protocol, termpass };
 
@@ -1412,42 +1431,42 @@ echo '</style>';
 				cache: false,
 				data,
 				success: function (response) {
-					checkErrors(response);
 					const parsed = parseJson(response);
-					const result = parsed?.result;
-					if (result) {
-						if (result.password) {
-							$('#sip_password_ec_input_' + id).val(result.password);
-							$('#sip_password_ec_input_text_' + id).css('opacity', 1);
-						}
-						if (result.username) {
-							$('#sip_username_ec_input_' + id).val(result.username);
-							$('#sip_username_ec_input_text_' + id).css('opacity', 1);
-						}
-						if (result.authname) {
-							$('#auth_name_ec_input_' + id).val(result.authname);
-							$('#auth_name_ec_input_text_' + id).css('opacity', 1);
-						}
-						// Populate the readable / copyable credentials panel
-						$('#termpass_server_value_' + id).text(result.server || '');
-						$('#termpass_username_value_' + id).text(result.username || '');
-						$('#termpass_authname_value_' + id).text(result.authname || '');
-						// keep the password masked until revealed; real value lives in data-secret
-						$('#termpass_password_value_' + id)
-							.attr('data-secret', result.password || '')
-							.removeClass('revealed')
-							.text(result.password ? '••••••••••••' : '');
-						$('#termpass_reveal_' + id).removeClass('fa-eye-slash').addClass('fa-eye');
-						$('#termpass_result_ec_' + id).fadeIn(300);
-					}
 					$('#set_termpass_loading_' + id).hide();
 					$('#set_termpass_text_' + id).show();
 					$('#set_termpass_button_' + id).attr('disabled', false);
+
+					// API / server-side error
+					if (parsed && parsed.success === false) {
+						showMessage(parsed.data || 'Unexpected error.', false);
+						return;
+					}
+
+					// result can be an empty array when nothing was returned
+					const result = parsed?.result;
+					if (!result || Array.isArray(result) || !result.server) {
+						showMessage("No SIP credentials were returned. Check the protocol and the connection's terminal password length.", false);
+						return;
+					}
+
+					// Populate the readable / copyable credentials panel
+					$('#termpass_server_value_' + id).text(result.server || '');
+					$('#termpass_username_value_' + id).text(result.username || '');
+					$('#termpass_authname_value_' + id).text(result.authname || '');
+					// keep the password masked until revealed; real value lives in data-secret
+					$('#termpass_password_value_' + id)
+						.attr('data-secret', result.password || '')
+						.removeClass('revealed')
+						.text(result.password ? '••••••••••••' : '');
+					$('#termpass_reveal_' + id).removeClass('fa-eye-slash').addClass('fa-eye');
+					$('#termpass_result_ec_' + id).fadeIn(300);
+					showMessage('Terminal password set.', true);
 				},
 				error: function (jqXHR, textStatus, errorThrown) {
 					$('#set_termpass_loading_' + id).hide();
 					$('#set_termpass_text_' + id).show();
 					$('#set_termpass_button_' + id).attr('disabled', false);
+					showMessage('Request failed: ' + (errorThrown || textStatus || 'unknown error') + '.', false);
 				}
 			});
 		}));
