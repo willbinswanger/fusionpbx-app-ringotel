@@ -81,7 +81,7 @@ $valid_methods = [
     'resync_names', 'resync_password', 'detach_user', 'users_state',
     'update_branch_with_default_settings', 'update_branch_with_updated_settings',
     'update_organization_with_default_settings', 'update_parks_with_updated_settings',
-    'activate_user', 'deactivate_user', 'reset_user_password', 'get_sip_credentials', 'switch_organization_mode',
+    'activate_user', 'deactivate_user', 'reset_user_password', 'get_sip_credentials', 'get_branch_options', 'switch_organization_mode',
     'create_integration', 'delete_integration', 'get_integration',
     'get_sms_trunk', 'create_sms_trunk', 'update_sms_trunk', 'delete_sms_trunk',
     'update_extension_name'

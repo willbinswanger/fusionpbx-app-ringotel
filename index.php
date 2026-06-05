@@ -1121,6 +1121,48 @@ echo '</style>';
 
 <script>
 	let ORG_ID = '';
+	// SIP protocols ("devices") available on this server/region, loaded from getBranchOptions
+	let TERMPASS_PROTOCOLS = null;
+
+	// Populate every terminal-password protocol <select> from the server's branch options.
+	// Falls back to the hardcoded <option>s in the markup if nothing has been loaded.
+	const populateTermpassProtocols = () => {
+		if (!Array.isArray(TERMPASS_PROTOCOLS) || TERMPASS_PROTOCOLS.length === 0) return;
+		const optionsHtml = TERMPASS_PROTOCOLS
+			.map((d) => `<option value="${d.proto}">${d.name || d.proto}</option>`)
+			.join('');
+		$('.termpass_protocol_ec_input').each(function () {
+			const current = $(this).val();
+			$(this).html(optionsHtml);
+			// preserve the prior selection when it is still valid
+			if (current && TERMPASS_PROTOCOLS.some((d) => d.proto === current)) {
+				$(this).val(current);
+			}
+		});
+	};
+
+	// Fetch the available SIP protocols once per page; values must come from
+	// getBranchOptions because they can differ by server/region.
+	const loadTermpassProtocols = () => {
+		const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
+		if (!orgid) return;
+		$.ajax({
+			url: "/app/<?php echo $application_directory ?>/service.php?method=get_branch_options",
+			type: "post",
+			cache: false,
+			data: { orgid },
+			success: function (response) {
+				const parsed = parseJson(response);
+				const devices = parsed?.result?.devices;
+				if (Array.isArray(devices) && devices.length > 0) {
+					TERMPASS_PROTOCOLS = devices;
+					populateTermpassProtocols();
+				}
+			},
+			error: function () { /* keep the hardcoded fallback options */ }
+		});
+	};
+
 	////// Edit User MODAL //////
 	const modalEditUser = ({ id, accountid, userid, domain, name, email, extension, sip_password, sip_username, auth_name, mobile, created }) => {
 		return (
@@ -1389,6 +1431,14 @@ echo '</style>';
 			const id = el.target.id.split('_').pop();
 			$(`#terminal_password_ec_input_text_${id}`).css('opacity', el.target.value.trim() ? 1 : 0);
 		}));
+
+		// Fill the SIP transport protocol selects from the server's branch options
+		// (the markup ships with hardcoded fallback options).
+		if (Array.isArray(TERMPASS_PROTOCOLS)) {
+			populateTermpassProtocols();
+		} else {
+			loadTermpassProtocols();
+		}
 
 		// SET TERMINAL PASSWORD (Ringotel getSIPCredentials)
 		$(`.set_termpass_button`).on('click', (function (el) {
