@@ -514,6 +514,29 @@ class ringotel {
 	}
 
 	/**
+	 * GET EXTENSION PASSWORD
+	 * Returns the FusionPBX SIP password for an extension in the current domain.
+	 * Used to pre-fill the SIP password field so it can be reused as the
+	 * terminal password.
+	 */
+	public function get_extension_password($queryParams) {
+		if (empty($queryParams['extension'])) {
+			return array('result' => array());
+		}
+
+		$sql = "    select password from v_extensions ";
+		$sql .= "   where domain_uuid = :domain_uuid ";
+		$sql .= "   and extension = :extension ";
+		$parameters = array();
+		$parameters['domain_uuid'] = $_SESSION['domain_uuid'];
+		$parameters['extension'] = $queryParams['extension'];
+		$db = database::new();
+		$row = $db->select($sql, $parameters, 'row');
+
+		return array('result' => array('password' => $row['password'] ?? ''));
+	}
+
+	/**
 	 * ACTIVATE USER
 	 */
 	public function activate_user($queryParams) {
