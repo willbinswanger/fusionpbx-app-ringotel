@@ -500,6 +500,20 @@ class ringotel {
 	}
 
 	/**
+	 * GET BRANCH OPTIONS
+	 * Returns branch options including the available SIP protocols ("devices")
+	 */
+	public function get_branch_options($queryParams) {
+		$param = array();
+
+		// Default param
+		$param["orgid"] = $queryParams['orgid'];
+
+		//main
+		return $this->api->get_branch_options($param);
+	}
+
+	/**
 	 * ACTIVATE USER
 	 */
 	public function activate_user($queryParams) {

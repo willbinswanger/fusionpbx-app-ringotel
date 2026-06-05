@@ -330,6 +330,21 @@ class ringotel_api_functions {
 	}
 
 	/**
+	 * Get Branch Options (includes the list of available SIP "devices"/protocols)
+	 * @param array $param
+	 * @return array JSON decoded string to an associative array
+	 */
+	public function get_branch_options(array $param) {
+		$parameters = array(
+			"method" => "getBranchOptions",
+			"params" => array(
+				"orgid" => $param['orgid']
+			)
+		);
+		return $this->ringotel_middleware_manager->handle($this->curl->post($this->baseUrl, $parameters));
+	}
+
+	/**
 	 * GET USERS
 	 * @param array $params
 	 * @return string
