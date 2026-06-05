@@ -931,6 +931,14 @@ echo '		grid-area: mobile_ec; ';
 echo '		justify-self: stretch; ';
 echo '		align-self: center; ';
 echo '	}';
+echo '	.termpass_ec {';
+echo '		grid-area: termpass_ec; ';
+echo '		justify-self: stretch; ';
+echo '		align-self: start; ';
+echo '		margin-top: 12px; ';
+echo '		padding-top: 16px; ';
+echo '		border-top: 1px solid #d9d9d9; ';
+echo '	}';
 echo '	.main_settings_edit_user { ';
 echo '		display: grid; ';
 echo '		grid-template-columns: auto auto; ';
@@ -939,7 +947,8 @@ echo '		grid-template-areas:  ';
 echo '		  "user_name_ec email_ec" ';
 echo '		  "extension_ec sip_password_ec" ';
 echo '		  "sip_username_ec auth_name_ec" ';
-echo '		  "mobile_ec null"; ';
+echo '		  "mobile_ec null" ';
+echo '		  "termpass_ec termpass_ec"; ';
 echo '	} ';
 
 echo '	@keyframes aware { ';
@@ -1225,25 +1234,29 @@ echo '</style>';
 										</div>
 
 										<div id="termpass_ec_${id}" class="termpass_ec paddingBottomEc">
-											<div style="font-weight: 600;font-size: 0.8rem;margin-bottom: 6px;color: #333;">Terminal password</div>
-											<div id="terminal_password_ec_${id}" class="terminal_password_ec paddingBottomEc">
-												<div id="terminal_password_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;opacity: 0;">
-													Terminal password
+											<div style="font-weight: 600;font-size: 0.92rem;color: #333;margin-bottom: 10px;">Terminal password (SIP endpoint registration)</div>
+											<div style="display: flex;flex-wrap: wrap;gap: 18px;">
+												<div id="terminal_password_ec_${id}" class="terminal_password_ec" style="flex: 1 1 220px;min-width: 0;">
+													<div id="terminal_password_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;opacity: 0;">
+														Terminal password
+													</div>
+													<input id="terminal_password_ec_input_${id}" name="terminal_password_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;width: 100%;" type="password" autocomplete="new-password" class="form-control terminal_password_ec_input" placeholder="Terminal password" aria-label="Terminal password" value="">
 												</div>
-												<input id="terminal_password_ec_input_${id}" name="terminal_password_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" type="password" autocomplete="new-password" class="form-control terminal_password_ec_input" placeholder="Terminal password" aria-label="Terminal password" value="">
+												<div style="flex: 1 1 220px;min-width: 0;">
+													<div id="termpass_protocol_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
+														SIP transport protocol
+													</div>
+													<select id="termpass_protocol_ec_input_${id}" name="termpass_protocol_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;width: 100%;" class="form-control termpass_protocol_ec_input" aria-label="SIP transport protocol">
+														<option value="sip">SIP (UDP)</option>
+														<option value="sip-tcp">SIP (TCP)</option>
+														<option value="sips">SIP (TLS/SRTP)</option>
+													</select>
+												</div>
 											</div>
-											<div id="termpass_protocol_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
-												SIP transport protocol
-											</div>
-											<select id="termpass_protocol_ec_input_${id}" name="termpass_protocol_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" class="form-control termpass_protocol_ec_input" aria-label="SIP transport protocol">
-												<option value="sip">SIP (UDP)</option>
-												<option value="sip-tcp">SIP (TCP)</option>
-												<option value="sips">SIP (TLS/SRTP)</option>
-											</select>
-											<div style="font-size: 0.72rem;color: #888;padding-top: 6px;line-height: 1.3;">
+											<div style="font-size: 0.72rem;color: #888;padding-top: 10px;line-height: 1.3;">
 												A separate password used only for registering SIP endpoints &mdash; it does <b>not</b> change the softphone's SIP registration password. Its length must match the connection's "Terminal password length" (Connection settings &rarr; Miscellaneous).
 											</div>
-											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${id || ''}" style="margin-top: 8px;width: 100%;">
+											<button id="set_termpass_button_${id}" type="button" class="btn btn-secondary set_termpass_button" data-userid="${id || ''}" style="margin-top: 12px;">
 												<span id="set_termpass_text_${id}" class="set_termpass_text">Set Terminal Password</span>
 												<span id="set_termpass_loading_${id}" class="set_termpass_loading" style="display: none;">
 													<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
