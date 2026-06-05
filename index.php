@@ -1133,6 +1133,29 @@ echo '</style>';
 	// SIP protocols ("devices") available on this server/region, loaded from getBranchOptions
 	let TERMPASS_PROTOCOLS = null;
 
+	// Copy text to the clipboard, with a fallback for non-secure (http) contexts.
+	const ringotelCopyToClipboard = (text, onDone) => {
+		if (!text) return;
+		const done = typeof onDone === 'function' ? onDone : function () {};
+		const fallback = () => {
+			const ta = document.createElement('textarea');
+			ta.value = text;
+			ta.style.position = 'fixed';
+			ta.style.opacity = '0';
+			document.body.appendChild(ta);
+			ta.focus();
+			ta.select();
+			try { document.execCommand('copy'); } catch (e) {}
+			document.body.removeChild(ta);
+			done();
+		};
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(text).then(done).catch(fallback);
+		} else {
+			fallback();
+		}
+	};
+
 	// Populate every terminal-password protocol <select> from the server's branch options.
 	// Falls back to the hardcoded <option>s in the markup if nothing has been loaded.
 	const populateTermpassProtocols = () => {
@@ -1216,7 +1239,11 @@ echo '</style>';
 											<div id="sip_password_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;${sip_password ? '' : 'opacity: 0;'}">
 												SIP password
 											</div>
-											  <input id="sip_password_ec_input_${id}" name="sip_password_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;" type="password" class="form-control sip_password_ec_input" placeholder="SIP password" aria-label="SIP password" value="${sip_password || ''}">
+											<div style="display: flex;align-items: center;gap: 8px;">
+												<input id="sip_password_ec_input_${id}" name="sip_password_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;flex: 1 1 auto;min-width: 0;" type="password" class="form-control sip_password_ec_input" placeholder="SIP password" aria-label="SIP password" value="${sip_password || ''}">
+												<i class="fa fa-eye sip_password_reveal" data-target-input="sip_password_ec_input_${id}" title="Show/Hide" style="cursor: pointer;color: #888;flex: 0 0 auto;"></i>
+												<i class="fa fa-copy sip_password_copy" data-target-input="sip_password_ec_input_${id}" title="Copy" style="cursor: pointer;color: #2196f3;flex: 0 0 auto;"></i>
+											</div>
 										</div>
 
 										<div id="sip_username_ec_${id}" class="sip_username_ec paddingBottomEc">
@@ -1241,6 +1268,7 @@ echo '</style>';
 														Terminal password
 													</div>
 													<input id="terminal_password_ec_input_${id}" name="terminal_password_ec_input" style="border: 0;border-bottom: 1px solid #80808063;border-radius: 0;width: 100%;" type="password" autocomplete="new-password" class="form-control terminal_password_ec_input" placeholder="Terminal password" aria-label="Terminal password" value="">
+													<span id="use_sip_password_${id}" class="use_sip_password" data-id="${id}" title="Copy the SIP password into this field" style="display: inline-block;margin-top: 6px;font-size: 0.72rem;color: #2196f3;cursor: pointer;"><i class="fa fa-clone" aria-hidden="true" style="padding-right: 4px;"></i>Use SIP password</span>
 												</div>
 												<div style="flex: 1 1 220px;min-width: 0;">
 													<div id="termpass_protocol_ec_input_text_${id}" style="transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
@@ -1443,6 +1471,42 @@ echo '</style>';
 		$(`.terminal_password_ec_input`).on('keyup', (function (el) {
 			const id = el.target.id.split('_').pop();
 			$(`#terminal_password_ec_input_text_${id}`).css('opacity', el.target.value.trim() ? 1 : 0);
+		}));
+
+		// Show / hide the SIP password field
+		$(`.sip_password_reveal`).on('click', (function (el) {
+			const icon = el.currentTarget;
+			const $inp = $('#' + $(icon).attr('data-target-input'));
+			if ($inp.attr('type') === 'password') {
+				$inp.attr('type', 'text');
+				$(icon).removeClass('fa-eye').addClass('fa-eye-slash');
+			} else {
+				$inp.attr('type', 'password');
+				$(icon).removeClass('fa-eye-slash').addClass('fa-eye');
+			}
+		}));
+
+		// Copy the SIP password to the clipboard
+		$(`.sip_password_copy`).on('click', (function (el) {
+			const icon = el.currentTarget;
+			const text = $('#' + $(icon).attr('data-target-input')).val();
+			ringotelCopyToClipboard(text, function () {
+				const original = icon.className;
+				icon.className = 'fa fa-check sip_password_copy';
+				$(icon).css('color', '#28a745');
+				setTimeout(function () {
+					icon.className = original;
+					$(icon).css('color', '#2196f3');
+				}, 1200);
+			});
+		}));
+
+		// Reuse the SIP password as the terminal password
+		$(`.use_sip_password`).on('click', (function (el) {
+			const id = el.currentTarget.id.split('_').pop();
+			const pwd = $('#sip_password_ec_input_' + id).val();
+			$('#terminal_password_ec_input_' + id).val(pwd).removeClass('alert-danger');
+			$('#terminal_password_ec_input_text_' + id).css('opacity', pwd ? 1 : 0);
 		}));
 
 		// Fill the SIP transport protocol selects from the server's branch options
@@ -3028,6 +3092,15 @@ echo '</style>';
 				$('#user_card_options_' + id).slideDown(100);
 			}
 		}));
+
+		// close the options menu when clicking anywhere outside of it
+		$(document).off('click.ringotelOptions').on('click.ringotelOptions', (function (e) {
+			if ($(e.target).closest('.options_user').length === 0 &&
+				$(e.target).closest('.user_card_options').length === 0) {
+				$('.user_card_options').slideUp(100);
+				$('.options_user').removeClass('active-option');
+			}
+		}));
 	}
 
 	const editUserEvent = () => {
@@ -3038,6 +3111,30 @@ echo '</style>';
 			const id = e.currentTarget.id.split('_').pop();
 
 			// console.log('edit_user', id);
+
+			// close the options menu
+			$('#user_card_options_' + id).slideUp(100);
+			$('#options_user_' + id).removeClass('active-option');
+
+			// auto-import the FusionPBX SIP password so it can be reused as the terminal password
+			const extension = $('#extension_ec_input_' + id).val();
+			if (extension) {
+				$.ajax({
+					url: "/app/<?php echo $application_directory; ?>/service.php?method=get_extension_password",
+					type: "post",
+					cache: false,
+					data: { extension },
+					success: function (response) {
+						let parsed = null;
+						try { parsed = JSON.parse(response); } catch (err) { parsed = null; }
+						const pwd = parsed && parsed.result ? parsed.result.password : '';
+						if (pwd) {
+							$('#sip_password_ec_input_' + id).val(pwd);
+							$('#sip_password_ec_input_text_' + id).css('opacity', 1);
+						}
+					}
+				});
+			}
 
 			$('#editUserModal_' + id).click();
 		}));
