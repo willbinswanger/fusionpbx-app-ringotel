@@ -3114,11 +3114,11 @@ echo '</style>';
 							</p>
 							${extensionExists ? '' : '<div style="bottom: 0;right: 0;font-size: 8pt;padding:  0.25rem;font-weight: bold;filter: none !important;">(Not Exist)</div>'}
 						</div>
-					<div style="display: flex;flex-direction: row;justify-content: space-between;font-size: 11pt;font-weight: 700;">
-						<div id='user_state_${id}' style='vertical-align: middle;justify-content: center;align-items: center;display: flex;'>
+					<div style="display: flex;flex-direction: row;flex-wrap: wrap;justify-content: space-between;align-items: center;font-size: 11pt;font-weight: 700;">
+						<div id='user_state_${id}' style='vertical-align: middle;justify-content: center;align-items: center;display: flex;flex-shrink: 0;'>
 							${stateElement}
 						</div>
-						<div id='user_status_${id}' style="font-size: 17pt;display:flex;align-items: center;">
+						<div id='user_status_${id}' style="font-size: 15pt;display:flex;flex-wrap: wrap;align-items: center;justify-content: flex-end;margin-left: auto;">
 							${statusElement}
 						</div>
 					</div>
