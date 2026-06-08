@@ -548,6 +548,14 @@ class ringotel {
 			return;
 		}
 
+		// The log node requires the same bearer token as the API; without it the
+		// request falls through to the admin SPA (HTTP 200 + HTML) instead of the file.
+		$token = $this->settings->get('ringotel', 'ringotel_token', null);
+		$headers = array('Accept: text/plain');
+		if (!empty($token)) {
+			$headers[] = 'Authorization: Bearer ' . $token;
+		}
+
 		// Ringotel serves the log files from a node that uses a self-signed certificate
 		$ch = curl_init($target['url']);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -555,13 +563,22 @@ class ringotel {
 		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		$content = curl_exec($ch);
 		$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		$content_type = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 		curl_close($ch);
 
 		if ($content === false || $http_code !== 200) {
 			http_response_code(502);
 			echo 'Unable to retrieve log file';
+			return;
+		}
+
+		// If the node returns the admin SPA (HTML) the request was not authorized for the file
+		if (stripos($content_type, 'text/html') !== false || stripos(ltrim((string) $content), '<!doctype html') === 0) {
+			http_response_code(502);
+			echo 'Unable to retrieve log file (the request to Ringotel was not authorized for this file).';
 			return;
 		}
 
