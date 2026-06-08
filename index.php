@@ -2948,6 +2948,10 @@ echo '</style>';
 			case 8:
 				html = '<span style="color: darkred;"><i style="padding: 0rem 0.5rem 0rem 0rem;" class="fa fa-circle" aria-hidden="true"></i>Busy</span>'; 					// darkred
 				break;
+			default:
+				// Any other state Ringotel reports (e.g. "At the desk") falls back to Online so the card is never blank
+				html = '<span style="color: #2196f3;"><i style="padding: 0rem 0.5rem 0rem 0rem;" class="fa fa-circle" aria-hidden="true"></i>Online</span>'; 				// #2196f3
+				break;
 		}
 		return html;
 	};
