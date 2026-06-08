@@ -3040,8 +3040,8 @@ echo '</style>';
 									<i class="fa fa-key" aria-hidden="true" style="padding-bottom: 3px;color: #e3ba1b;"></i>
 								  </button>
 								</span>
-								<span class="userLogs" data-toggle="modal" data-target="#userLogsModal" style="padding: 8px;color: #2196f3;cursor: pointer;" alt="User Logs" title="View logs" data-userid="${other?.userid || ''}" data-domain="${domain || ''}" data-name="${(name || extension).replace(/"/g, '&quot;')}" data-extension="${extension}">
-										<i class="fa fa-file-text-o" aria-hidden="true" style="color:#2196f3;"></i>
+								<span class="userLogs" data-toggle="modal" data-target="#userLogsModal" style="padding: 8px;color: #2196f3;cursor: pointer;" alt="User Logs" title="View logs" data-userid="${id || ''}" data-domain="${domain || ''}" data-name="${(name || extension).replace(/"/g, '&quot;')}" data-extension="${extension}">
+										<i class="fa fa-file" aria-hidden="true" style="color:#2196f3;"></i>
 									</span>
 								<span class="deactivateUser" style="padding-left: 8px;padding-right: 4px;color: #2196f3;cursor: pointer;" alt="Deactivate User" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
 									<i class="fa fa-plug" aria-hidden="true" style="color:#c31919;"></i>
