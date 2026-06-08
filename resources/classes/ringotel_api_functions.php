@@ -330,6 +330,23 @@ class ringotel_api_functions {
 	}
 
 	/**
+	 * GET USER LOGS
+	 * Returns the list of log files Ringotel has stored for a user
+	 * @param array $param
+	 * @return array JSON decoded string to an associative array
+	 */
+	public function get_user_logs(array $param) {
+		$parameters = array(
+			"method" => "getUserLogs",
+			"params" => array(
+				"userid" => $param['userid'],
+				"domain" => $param['domain']
+			)
+		);
+		return $this->ringotel_middleware_manager->handle($this->curl->post($this->baseUrl, $parameters));
+	}
+
+	/**
 	 * Get Branch Options (includes the list of available SIP "devices"/protocols)
 	 * @param array $param
 	 * @return array JSON decoded string to an associative array

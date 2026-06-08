@@ -687,6 +687,37 @@ echo '	</div>';
 
 
 /////////////////////////////////////
+/// User Logs
+/////////////////////////////////////
+echo '	<div class="modal hide fade" id="userLogsModal" tabindex="-1" role="dialog" aria-labelledby="userLogsModalLabel" aria-hidden="true" style="display: none;">';
+echo '	  <div class="modal-dialog modal-lg modal-dialog-centered" role="document" id="userLogsModal_modal_body">';
+echo '	    <div class="modal-content">';
+echo '	      <div class="modal-header">';
+echo '	        <h5 class="modal-title" id="userLogsModalLabel">User Logs</h5>';
+echo '	        <button type="button" class="close" data-dismiss="modal" aria-label="Close">';
+echo '	          <span aria-hidden="true">&times;</span>';
+echo '	        </button>';
+echo '	      </div>';
+echo '	      <div class="modal-body" style="width: auto;" id="modal_body_userLogs">';
+echo '	        <div id="user_logs_loading" style="display: none;text-align: center;padding: 1rem;">';
+echo '	          <span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Loading logs...';
+echo '	        </div>';
+echo '	        <div id="user_logs_empty" style="display: none;color: #777;padding: 1rem;text-align: center;">No logs available for this user.</div>';
+echo '	        <div id="user_logs_error" style="display: none;color: #bb1a1a;padding: 1rem;text-align: center;"></div>';
+echo '	        <table id="user_logs_table" class="table" style="display: none;margin-bottom: 0;">';
+echo '	          <thead><tr><th>Date</th><th>Size</th><th style="text-align: right;">Download</th></tr></thead>';
+echo '	          <tbody id="user_logs_tbody"></tbody>';
+echo '	        </table>';
+echo '	      </div>';
+echo '	      <div class="modal-footer">';
+echo '	        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>';
+echo '	      </div>';
+echo '	    </div>';
+echo '	  </div>';
+echo '	</div>';
+
+
+/////////////////////////////////////
 /// Organization Package Error
 /////////////////////////////////////
 echo '	<div id="package_org_popup" style="-webkit-transition: all 0.5s;transition: all 0.5s;position: absolute;display: block;width: 14rem;opacity:0;" class="toast" role="alert" aria-live="assertive" aria-atomic="true">';
@@ -3009,6 +3040,9 @@ echo '</style>';
 									<i class="fa fa-key" aria-hidden="true" style="padding-bottom: 3px;color: #e3ba1b;"></i>
 								  </button>
 								</span>
+								<span class="userLogs" data-toggle="modal" data-target="#userLogsModal" style="padding: 8px;color: #2196f3;cursor: pointer;" alt="User Logs" title="View logs" data-userid="${other?.userid || ''}" data-domain="${domain || ''}" data-name="${(name || extension).replace(/"/g, '&quot;')}" data-extension="${extension}">
+										<i class="fa fa-file-text-o" aria-hidden="true" style="color:#2196f3;"></i>
+									</span>
 								<span class="deactivateUser" style="padding-left: 8px;padding-right: 4px;color: #2196f3;cursor: pointer;" alt="Deactivate User" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
 									<i class="fa fa-plug" aria-hidden="true" style="color:#c31919;"></i>
 								</span>
@@ -3359,6 +3393,7 @@ echo '</style>';
 			reSyncAllNamesEvent();
 			reSyncAllPasswordEvent();
 			resetUserPasswordEvent();
+			userLogsEvent();
 
 			// Add Users to Select List for Integration
 			$('#manage_numbers_users').html(users?.map((item) => {
@@ -4594,6 +4629,101 @@ echo '</style>';
 				$('#email_for_reset_password').val('');
 				$('#reset_user_password_button').attr('disabled', true);
 			}
+		}));
+	};
+
+	// Format a log file size (bytes) for display
+	const formatLogSize = (bytes) => {
+		const n = Number(bytes) || 0;
+		if (n < 1024) return n + ' B';
+		if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+		return (n / (1024 * 1024)).toFixed(1) + ' MB';
+	};
+
+	// Trigger a log file download via a hidden iframe so an error response never navigates the page
+	const downloadUserLog = (userid, domain, name) => {
+		const url = "/app/<?php echo $application_directory; ?>/service.php?method=download_user_log"
+			+ "&userid=" + encodeURIComponent(userid)
+			+ "&domain=" + encodeURIComponent(domain)
+			+ "&name=" + encodeURIComponent(name);
+		let frame = document.getElementById('user_log_download_frame');
+		if (!frame) {
+			frame = document.createElement('iframe');
+			frame.id = 'user_log_download_frame';
+			frame.style.display = 'none';
+			document.body.appendChild(frame);
+		}
+		frame.src = url;
+	};
+
+	// Bind the "View logs" button on the user cards
+	const userLogsEvent = () => {
+		$('.userLogs').off('click');
+		$('.userLogs').on('click', (function (el) {
+			const userid = el.currentTarget.getAttribute('data-userid') || '';
+			const domain = el.currentTarget.getAttribute('data-domain') || '';
+			const name = el.currentTarget.getAttribute('data-name') || '';
+			const extension = el.currentTarget.getAttribute('data-extension') || '';
+
+			// Modal title
+			$('#userLogsModalLabel').text('User Logs' + (name ? ' — ' + name : '') + (extension ? ' (' + extension + ')' : ''));
+
+			// Reset modal states
+			$('#user_logs_table').hide();
+			$('#user_logs_empty').hide();
+			$('#user_logs_error').hide().text('');
+			$('#user_logs_tbody').empty();
+			$('#user_logs_loading').show();
+
+			if (!userid || !domain) {
+				$('#user_logs_loading').hide();
+				$('#user_logs_error').show().text('This user has no Ringotel identifier yet, so logs cannot be retrieved.');
+				return;
+			}
+
+			$.ajax({
+				url: "/app/<?php echo $application_directory; ?>/service.php?method=get_user_logs",
+				type: "get",
+				data: { userid, domain },
+				success: function (response) {
+					$('#user_logs_loading').hide();
+					let parsed = null;
+					try { parsed = JSON.parse(response.replaceAll("\\", "")); } catch (e) { parsed = null; }
+					if (!parsed || parsed.success === false) {
+						$('#user_logs_error').show().text((parsed && parsed.data) ? parsed.data : 'Unable to retrieve logs.');
+						return;
+					}
+					const logs = Array.isArray(parsed.result) ? parsed.result : [];
+					if (logs.length === 0) {
+						$('#user_logs_empty').show();
+						return;
+					}
+					const rows = logs.map((log) => {
+						const safeName = (log.name || '').replace(/"/g, '&quot;');
+						return `<tr>
+							<td style="vertical-align: middle;">${log.date || ''}</td>
+							<td style="vertical-align: middle;">${formatLogSize(log.size)}</td>
+							<td style="text-align: right;vertical-align: middle;">
+								<button type="button" class="btn btn-sm btn-primary download_user_log_button" data-userid="${userid}" data-domain="${domain}" data-name="${safeName}" style="color: white;">
+									<i class="fa fa-download" aria-hidden="true"></i> Download
+								</button>
+							</td>
+						</tr>`;
+					});
+					$('#user_logs_tbody').html(rows.join(''));
+					$('#user_logs_table').show();
+
+					// Bind the per-row download buttons
+					$('.download_user_log_button').off('click').on('click', (function (ev) {
+						const t = ev.currentTarget;
+						downloadUserLog(t.getAttribute('data-userid'), t.getAttribute('data-domain'), t.getAttribute('data-name'));
+					}));
+				},
+				error: function () {
+					$('#user_logs_loading').hide();
+					$('#user_logs_error').show().text('Unable to retrieve logs. Please try again.');
+				}
+			});
 		}));
 	};
 
