@@ -82,6 +82,7 @@ $valid_methods = [
     'update_branch_with_default_settings', 'update_branch_with_updated_settings',
     'update_organization_with_default_settings', 'update_parks_with_updated_settings',
     'activate_user', 'deactivate_user', 'reset_user_password', 'get_sip_credentials', 'get_branch_options', 'get_extension_password', 'switch_organization_mode',
+    'get_user_logs', 'download_user_log',
     'create_integration', 'delete_integration', 'get_integration',
     'get_sms_trunk', 'create_sms_trunk', 'update_sms_trunk', 'delete_sms_trunk',
     'update_extension_name'
@@ -96,6 +97,11 @@ if (!empty($integration)) {
     $ringotel_api_functions = new ringotel_api_functions($settings, $ringotel_api_url, null, null);
     $ringotel = new ringotel($settings, $ringotel_api_functions);
     if (method_exists($ringotel, $object_method)) {
+        // download_user_log streams a file (Content-Disposition) instead of JSON, so it bypasses the converter
+        if ($object_method === 'download_user_log') {
+            $ringotel->download_user_log($queryParams);
+            exit;
+        }
         $output_format_converter = new ringotel_response_output_converter();
         echo $output_format_converter->associative_array_to_json($ringotel->{$object_method}($queryParams));
     } else {

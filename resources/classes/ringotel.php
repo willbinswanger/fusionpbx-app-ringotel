@@ -500,6 +500,80 @@ class ringotel {
 	}
 
 	/**
+	 * GET USER LOGS
+	 * Returns the list of log files Ringotel has stored for a user
+	 */
+	public function get_user_logs($queryParams) {
+		$param = array(
+			"userid" => $queryParams['userid'],
+			"domain" => $queryParams['domain']
+		);
+
+		//main
+		return $this->api->get_user_logs($param);
+	}
+
+	/**
+	 * DOWNLOAD USER LOG
+	 * Streams a single user log file to the browser as a download.
+	 * The file is looked up from the user's own log list (returned by Ringotel)
+	 * so that only URLs Ringotel issued for this user can ever be fetched.
+	 */
+	public function download_user_log($queryParams) {
+		$userid = $queryParams['userid'] ?? '';
+		$domain = $queryParams['domain'] ?? '';
+		$name = $queryParams['name'] ?? '';
+
+		if (empty($userid) || empty($domain) || empty($name)) {
+			http_response_code(400);
+			echo 'Missing required parameters';
+			return;
+		}
+
+		// Resolve the requested file from the user's log list (prevents arbitrary URL fetching)
+		$logs = $this->api->get_user_logs(array("userid" => $userid, "domain" => $domain));
+		$files = (isset($logs['result']) && is_array($logs['result'])) ? $logs['result'] : array();
+
+		$target = null;
+		foreach ($files as $file) {
+			if (isset($file['name']) && $file['name'] === $name) {
+				$target = $file;
+				break;
+			}
+		}
+
+		if (empty($target) || empty($target['url'])) {
+			http_response_code(404);
+			echo 'Log file not found';
+			return;
+		}
+
+		// Ringotel serves the log files from a node that uses a self-signed certificate
+		$ch = curl_init($target['url']);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		$content = curl_exec($ch);
+		$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+
+		if ($content === false || $http_code !== 200) {
+			http_response_code(502);
+			echo 'Unable to retrieve log file';
+			return;
+		}
+
+		// Stream the file to the browser as a download
+		$download_name = basename($name);
+		header('Content-Type: text/plain');
+		header('Content-Disposition: attachment; filename="' . $download_name . '"');
+		header('Content-Length: ' . strlen($content));
+		echo $content;
+	}
+
+	/**
 	 * GET BRANCH OPTIONS
 	 * Returns branch options including the available SIP protocols ("devices")
 	 */
