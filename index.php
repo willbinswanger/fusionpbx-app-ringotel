@@ -240,6 +240,13 @@ echo '				<h4 class="card-title" style="font-weight: 400; padding: 0.5rem 0.2rem
 echo '					<span id="users_count">';
 echo '					</span>';
 echo '				</h4>';
+echo '				<div style="display: flex;align-items: center;padding: 0.5rem 0.75rem;">';
+echo '					<label for="user_sort_mode" style="margin: 0 0.5rem 0 0;font-size: 10pt;color: #555;font-weight: 600;white-space: nowrap;">Sort by</label>';
+echo '					<select id="user_sort_mode" class="form-control" style="width: auto;height: auto;padding: 0.25rem 1.5rem 0.25rem 0.5rem;font-size: 10pt;">';
+echo '						<option value="extension">Extension</option>';
+echo '						<option value="name">First name (A&ndash;Z)</option>';
+echo '					</select>';
+echo '				</div>';
 echo '				<div class="reSyncAllNames" style="margin-left: auto;display: flex;align-items: center;color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Names">';
 echo '					<svg fill="#007bff" width="15px" height="15px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">';
 echo '						<path d="M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"/>';
@@ -1132,6 +1139,20 @@ echo '</style>';
 	let ORG_ID = '';
 	// SIP protocols ("devices") available on this server/region, loaded from getBranchOptions
 	let TERMPASS_PROTOCOLS = null;
+
+	// How the user/extension cards on the main page are ordered:
+	// 'extension' = numeric extension order (default), 'name' = alphabetical by first name
+	let userSortMode = 'extension';
+
+	// Comparator for ordering the user/extension cards according to userSortMode
+	const compareUserCards = (a, b) => {
+		if (userSortMode === 'name') {
+			const an = (a.name || a.extension || '').trim().toLowerCase();
+			const bn = (b.name || b.extension || '').trim().toLowerCase();
+			return an.localeCompare(bn, undefined, { numeric: true, sensitivity: 'base' });
+		}
+		return parseInt(a.extension) - parseInt(b.extension);
+	};
 
 	// Copy text to the clipboard, with a fallback for non-secure (http) contexts.
 	const ringotelCopyToClipboard = (text, onDone) => {
@@ -3297,8 +3318,8 @@ echo '</style>';
 		// MAP ALL DATA FROM ALL BRANCHES
 		const regexp = /[\+*]/; // Parks param detect
 		const parks = parksUserExtensions.filter((ext) => ext.extension.match(regexp));
-		const users = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
-		const extensions = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status !== 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
+		const users = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort(compareUserCards);
+		const extensions = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status !== 1)).sort(compareUserCards);
 
 		const parks_count = parks?.length;
 		const users_count = users?.length;
@@ -4857,6 +4878,12 @@ echo '</style>';
 	}));
 
 	// $('#checkbox-switcher-for-integrations').off('click');
+
+	// Sort control for the user/extension cards on the main page
+	$('#user_sort_mode').on('change', function () {
+		userSortMode = this.value === 'name' ? 'name' : 'extension';
+		getUsersWithUpdateElements();
+	});
 
 	$('#footer').fadeOut();
 
