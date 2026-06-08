@@ -4806,6 +4806,16 @@ echo '</style>';
 		// Bind Event Listener [Delete User]
 		$(".deactivateUser").on('click', (function (el) {
 			const id = el.currentTarget.getAttribute('data-id');
+			const extension = el.currentTarget.getAttribute('data-extension');
+
+			// Confirm before deactivating to prevent accidental deactivation
+			const confirmMessage = extension
+				? `Are you sure you want to deactivate extension ${extension}?\n\nThe user will lose access to Ringotel until they are reactivated.`
+				: 'Are you sure you want to deactivate this user?\n\nThey will lose access to Ringotel until they are reactivated.';
+			if (!window.confirm(confirmMessage)) {
+				return;
+			}
+
 			$(el.currentTarget).children('i').css('animation', 'plug 3s infinite');
 
 			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
