@@ -247,7 +247,7 @@ echo '						<option value="extension">Extension</option>';
 echo '						<option value="name">First name (A&ndash;Z)</option>';
 echo '					</select>';
 echo '				</div>';
-echo '				<div class="reSyncAllNames" style="margin-left: auto;display: flex;align-items: center;color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Names">';
+echo '				<div class="reSyncAllNames" style="display: none;align-items: center;color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Names">';
 echo '					<svg fill="#007bff" width="15px" height="15px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">';
 echo '						<path d="M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"/>';
 echo '					</svg>';
@@ -255,7 +255,7 @@ echo '					<div id="resync_names" style="padding: 5px 10px;font-weight: 700;font
 echo '						re-Sync Extensions';
 echo '					</div>';
 echo '				</div>';
-echo '				<div class="reSyncAllPassword" style="display: flex;align-items: center;color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Password">';
+echo '				<div class="reSyncAllPassword" style="display: none;align-items: center;color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Password">';
 echo '					<svg fill="#007bff" width="15px" height="15px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">';
 echo '						<path d="M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"/>';
 echo '					</svg>';
@@ -263,7 +263,7 @@ echo '					<div id="resync_password" style="padding: 5px 10px;font-weight: 700;f
 echo '						re-Sync Passwords';
 echo '					</div>';
 echo '				</div>';
-echo '	     		<button data-toggle="modal" data-target="#createUserModal" id="create_users_button" class="btn btn-primary create_users_button" style="width: 161px;color: #007bff;background-color: transparent;border-color: transparent;font-weight: bold;">';
+echo '	     		<button data-toggle="modal" data-target="#createUserModal" id="create_users_button" class="btn btn-primary create_users_button" style="margin-left: auto;width: 161px;color: #007bff;background-color: transparent;border-color: transparent;font-weight: bold;">';
 echo '	     			<span id="create_users_text" class="create_users_text">+ Add Extensions</span>';
 echo '					<span id="create_users_loading" class="create_users_loading" style="display: none;">';
 echo '	 					<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>	';
