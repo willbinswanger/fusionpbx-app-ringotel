@@ -4640,20 +4640,50 @@ echo '</style>';
 		return (n / (1024 * 1024)).toFixed(1) + ' MB';
 	};
 
-	// Trigger a log file download via a hidden iframe so an error response never navigates the page
-	const downloadUserLog = (userid, domain, name) => {
+	// Fetch the log file and save it from a blob. Using fetch (instead of a hidden
+	// iframe) lets us detect a server-side error and show it in the modal, rather
+	// than silently swallowing the failed response so the button appears to do nothing.
+	const downloadUserLog = (btn, userid, domain, name) => {
 		const url = "/app/<?php echo $application_directory; ?>/service.php?method=download_user_log"
 			+ "&userid=" + encodeURIComponent(userid)
 			+ "&domain=" + encodeURIComponent(domain)
 			+ "&name=" + encodeURIComponent(name);
-		let frame = document.getElementById('user_log_download_frame');
-		if (!frame) {
-			frame = document.createElement('iframe');
-			frame.id = 'user_log_download_frame';
-			frame.style.display = 'none';
-			document.body.appendChild(frame);
+
+		const original = btn ? btn.innerHTML : null;
+		if (btn) {
+			btn.disabled = true;
+			btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Downloading...';
 		}
-		frame.src = url;
+		$('#user_logs_error').hide().text('');
+
+		fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/plain' } })
+			.then(function (resp) {
+				if (!resp.ok) {
+					return resp.text().then(function (msg) {
+						throw new Error((msg && msg.trim()) ? msg.trim() : ('Download failed (HTTP ' + resp.status + ').'));
+					});
+				}
+				return resp.blob();
+			})
+			.then(function (blob) {
+				const objectUrl = window.URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = objectUrl;
+				a.download = (name && name.split('/').pop()) || 'user.log';
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				window.URL.revokeObjectURL(objectUrl);
+			})
+			.catch(function (err) {
+				$('#user_logs_error').show().text((err && err.message) ? err.message : 'Unable to download log file.');
+			})
+			.finally(function () {
+				if (btn) {
+					btn.disabled = false;
+					btn.innerHTML = original;
+				}
+			});
 	};
 
 	// Bind the "View logs" button on the user cards
@@ -4716,7 +4746,7 @@ echo '</style>';
 					// Bind the per-row download buttons
 					$('.download_user_log_button').off('click').on('click', (function (ev) {
 						const t = ev.currentTarget;
-						downloadUserLog(t.getAttribute('data-userid'), t.getAttribute('data-domain'), t.getAttribute('data-name'));
+						downloadUserLog(t, t.getAttribute('data-userid'), t.getAttribute('data-domain'), t.getAttribute('data-name'));
 					}));
 				},
 				error: function () {

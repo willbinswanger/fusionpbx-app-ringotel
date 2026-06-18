@@ -534,11 +534,21 @@ class ringotel {
 		$logs = $this->api->get_user_logs(array("userid" => $userid, "domain" => $domain));
 		$files = (isset($logs['result']) && is_array($logs['result'])) ? $logs['result'] : array();
 
+		// The service-layer sanitizer runs every request parameter through
+		// htmlspecialchars(), so a name containing & " ' < > arrives encoded
+		// (e.g. "a &amp; b.log") and would never match the raw Ringotel name.
+		// Compare against the decoded form, and fall back to a basename match.
+		$candidates = array($name, html_entity_decode($name, ENT_QUOTES));
 		$target = null;
 		foreach ($files as $file) {
-			if (isset($file['name']) && $file['name'] === $name) {
-				$target = $file;
-				break;
+			if (!isset($file['name'])) {
+				continue;
+			}
+			foreach ($candidates as $candidate) {
+				if ($file['name'] === $candidate || basename($file['name']) === basename($candidate)) {
+					$target = $file;
+					break 2;
+				}
 			}
 		}
 
@@ -571,7 +581,7 @@ class ringotel {
 
 		if ($content === false || $http_code !== 200) {
 			http_response_code(502);
-			echo 'Unable to retrieve log file';
+			echo 'Unable to retrieve log file from Ringotel (HTTP ' . intval($http_code) . ').';
 			return;
 		}
 
