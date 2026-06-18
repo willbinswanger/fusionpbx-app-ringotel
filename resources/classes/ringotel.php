@@ -558,38 +558,42 @@ class ringotel {
 			return;
 		}
 
-		// The file is served from a separate Ringotel node (e.g.
-		// https://<ip>/userlogs/<domain>/<file>), not the admin API host, so the API
-		// Bearer token is not accepted there as a header (it returns a bare 401). Try the
-		// realistic auth schemes in turn and use the first that returns the actual file.
+		// Per the Ringotel API (getLogFile), a log file is downloaded from the admin API
+		// host - <api>/userlogs/<domain>/<file> - authenticated with the same Bearer token
+		// as every other call. The url returned by getUserLogs points at the raw storage
+		// node (e.g. https://<ip>/userlogs/...), which does NOT accept the Bearer header
+		// (bare 401), so route the request through the API host. As a fallback the raw
+		// node does accept the token as a query parameter.
 		$token = (string) $this->settings->get('ringotel', 'ringotel_token', null);
-		$base_url = (string) $target['url'];
-		$sep = (strpos($base_url, '?') === false) ? '?' : '&';
+		$raw_url = (string) $target['url'];
+		$path = (string) parse_url($raw_url, PHP_URL_PATH); // /userlogs/<domain>/<file>
+		$api_base = rtrim((string) $this->settings->get('ringotel', 'ringotel_api', ''), '/');
+		$sep = (strpos($raw_url, '?') === false) ? '?' : '&';
 
-		$attempts = array(
-			array('label' => 'bearer-header',      'url' => $base_url,                                              'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
-			array('label' => 'token-query',        'url' => $base_url . $sep . 'token=' . urlencode($token),        'headers' => array('Accept: text/plain')),
-			array('label' => 'access_token-query', 'url' => $base_url . $sep . 'access_token=' . urlencode($token), 'headers' => array('Accept: text/plain')),
-		);
+		$attempts = array();
+		if ($api_base !== '' && $path !== '') {
+			$attempts[] = array('url' => $api_base . $path, 'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token));
+		}
+		$attempts[] = array('url' => $raw_url . $sep . 'token=' . urlencode($token), 'headers' => array('Accept: text/plain'));
 
 		$content = false;
-		$diag = array();
 		foreach ($attempts as $attempt) {
 			$ch = curl_init($attempt['url']);
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // log node presents a self-signed / bare-IP cert
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // raw log node presents a bare-IP / self-signed cert
 			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 			curl_setopt($ch, CURLOPT_HTTPHEADER, $attempt['headers']);
 			$body = curl_exec($ch);
 			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-			$ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 			curl_close($ch);
 
-			$diag[] = $attempt['label'] . '=' . $code;
-			$is_html = (stripos($ctype, 'text/html') !== false || stripos(ltrim((string) $body), '<!doctype html') === 0);
-			if ($body !== false && $body !== '' && $code === 200 && !$is_html) {
+			// Reject only an actual HTML document (the unauthenticated admin SPA fallback).
+			// Do NOT reject by content-type: the node serves .txt logs as text/html.
+			$ltrimmed = ltrim((string) $body);
+			$looks_like_spa = (stripos($ltrimmed, '<!doctype html') === 0 || stripos($ltrimmed, '<html') === 0);
+			if ($body !== false && $body !== '' && $code === 200 && !$looks_like_spa) {
 				$content = $body;
 				break;
 			}
@@ -598,10 +602,6 @@ class ringotel {
 		if ($content === false) {
 			http_response_code(502);
 			echo 'Unable to retrieve log file from Ringotel.';
-			// DIAGNOSTIC (temporary): which auth schemes were tried and their status codes
-			echo "\n\n---- DIAGNOSTIC (temporary) ----";
-			echo "\nattempts: " . implode(', ', $diag);
-			echo "\nfetched_url_host: " . parse_url($base_url, PHP_URL_HOST);
 			return;
 		}
 
