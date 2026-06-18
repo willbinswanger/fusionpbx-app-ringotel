@@ -558,50 +558,50 @@ class ringotel {
 			return;
 		}
 
-		// The log node requires the same bearer token as the API; without it the
-		// request falls through to the admin SPA (HTTP 200 + HTML) instead of the file.
-		$token = $this->settings->get('ringotel', 'ringotel_token', null);
-		$headers = array('Accept: text/plain');
-		if (!empty($token)) {
-			$headers[] = 'Authorization: Bearer ' . $token;
+		// The file is served from a separate Ringotel node (e.g.
+		// https://<ip>/userlogs/<domain>/<file>), not the admin API host, so the API
+		// Bearer token is not accepted there as a header (it returns a bare 401). Try the
+		// realistic auth schemes in turn and use the first that returns the actual file.
+		$token = (string) $this->settings->get('ringotel', 'ringotel_token', null);
+		$base_url = (string) $target['url'];
+		$sep = (strpos($base_url, '?') === false) ? '?' : '&';
+
+		$attempts = array(
+			array('label' => 'bearer-header',      'url' => $base_url,                                              'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
+			array('label' => 'token-query',        'url' => $base_url . $sep . 'token=' . urlencode($token),        'headers' => array('Accept: text/plain')),
+			array('label' => 'access_token-query', 'url' => $base_url . $sep . 'access_token=' . urlencode($token), 'headers' => array('Accept: text/plain')),
+		);
+
+		$content = false;
+		$diag = array();
+		foreach ($attempts as $attempt) {
+			$ch = curl_init($attempt['url']);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // log node presents a self-signed / bare-IP cert
+			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, $attempt['headers']);
+			$body = curl_exec($ch);
+			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+			$ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+			curl_close($ch);
+
+			$diag[] = $attempt['label'] . '=' . $code;
+			$is_html = (stripos($ctype, 'text/html') !== false || stripos(ltrim((string) $body), '<!doctype html') === 0);
+			if ($body !== false && $body !== '' && $code === 200 && !$is_html) {
+				$content = $body;
+				break;
+			}
 		}
 
-		// Ringotel serves the log files from a node that uses a self-signed certificate
-		$ch = curl_init($target['url']);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		$content = curl_exec($ch);
-		$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-		$content_type = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-		curl_close($ch);
-
-		if ($content === false || $http_code !== 200) {
+		if ($content === false) {
 			http_response_code(502);
-			echo 'Unable to retrieve log file from Ringotel (HTTP ' . intval($http_code) . ').';
-			// DIAGNOSTIC (temporary): expose the resolved log entry + upstream
-			// response so we can see the real url shape and what 401 returns.
+			echo 'Unable to retrieve log file from Ringotel.';
+			// DIAGNOSTIC (temporary): which auth schemes were tried and their status codes
 			echo "\n\n---- DIAGNOSTIC (temporary) ----";
-			echo "\nentry: " . json_encode($target);
-			echo "\nfetched_url_host: " . parse_url((string) $target['url'], PHP_URL_HOST);
-			echo "\nupstream_http_code: " . intval($http_code);
-			echo "\nupstream_content_type: " . $content_type;
-			echo "\nupstream_body_snippet: " . substr((string) $content, 0, 400);
-			return;
-		}
-
-		// If the node returns the admin SPA (HTML) the request was not authorized for the file
-		if (stripos($content_type, 'text/html') !== false || stripos(ltrim((string) $content), '<!doctype html') === 0) {
-			http_response_code(502);
-			echo 'Unable to retrieve log file (the request to Ringotel was not authorized for this file).';
-			// DIAGNOSTIC (temporary)
-			echo "\n\n---- DIAGNOSTIC (temporary) ----";
-			echo "\nentry: " . json_encode($target);
-			echo "\nfetched_url_host: " . parse_url((string) $target['url'], PHP_URL_HOST);
-			echo "\nupstream_content_type: " . $content_type;
+			echo "\nattempts: " . implode(', ', $diag);
+			echo "\nfetched_url_host: " . parse_url($base_url, PHP_URL_HOST);
 			return;
 		}
 

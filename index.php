@@ -705,7 +705,7 @@ echo '	        </div>';
 echo '	        <div id="user_logs_empty" style="display: none;color: #777;padding: 1rem;text-align: center;">No logs available for this user.</div>';
 echo '	        <div id="user_logs_error" style="display: none;color: #bb1a1a;padding: 1rem;text-align: center;"></div>';
 echo '	        <table id="user_logs_table" class="table" style="display: none;margin-bottom: 0;">';
-echo '	          <thead><tr><th>Date</th><th>Size</th><th style="text-align: right;">Download</th></tr></thead>';
+echo '	          <thead><tr><th>Device</th><th>Date</th><th>Size</th><th style="text-align: right;">Download</th></tr></thead>';
 echo '	          <tbody id="user_logs_tbody"></tbody>';
 echo '	        </table>';
 echo '	      </div>';
@@ -4640,6 +4640,24 @@ echo '</style>';
 		return (n / (1024 * 1024)).toFixed(1) + ' MB';
 	};
 
+	// Ringotel returns no device field, so (like the admin portal) infer the device
+	// from the log filename "<userid>-<deviceid>.txt[.bak]": a UUID device id is a
+	// mobile app, a "<timestamp>-<hex>" id is the desktop app.
+	const classifyLogDevice = (rawName, userid) => {
+		let s = String(rawName || '').replace(/\.txt(\.bak)?$/i, '');
+		if (userid && s.indexOf(userid + '-') === 0) {
+			s = s.slice((userid + '-').length);
+		}
+		const deviceid = s;
+		if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deviceid)) {
+			return { label: 'iOS', id: deviceid, icon: 'fa-mobile' };
+		}
+		if (/^\d{13}-[0-9a-f]+$/i.test(deviceid)) {
+			return { label: 'Desktop', id: deviceid, icon: 'fa-desktop' };
+		}
+		return { label: 'Device', id: deviceid, icon: 'fa-question-circle' };
+	};
+
 	// Fetch the log file and save it from a blob. Using fetch (instead of a hidden
 	// iframe) lets us detect a server-side error and show it in the modal, rather
 	// than silently swallowing the failed response so the button appears to do nothing.
@@ -4730,7 +4748,12 @@ echo '</style>';
 					}
 					const rows = logs.map((log) => {
 						const safeName = (log.name || '').replace(/"/g, '&quot;');
+						const dev = classifyLogDevice(log.name, userid);
 						return `<tr>
+							<td style="vertical-align: middle;white-space: nowrap;" title="${dev.label}: ${dev.id}">
+								<i class="fa ${dev.icon}" aria-hidden="true" style="margin-right: 8px;font-size: 14pt;color: #555;vertical-align: middle;"></i>
+								<span style="vertical-align: middle;">${dev.label}<br><span style="color: #999;font-size: 8pt;">${dev.id}</span></span>
+							</td>
 							<td style="vertical-align: middle;">${log.date || ''}</td>
 							<td style="vertical-align: middle;">${formatLogSize(log.size)}</td>
 							<td style="text-align: right;vertical-align: middle;">
