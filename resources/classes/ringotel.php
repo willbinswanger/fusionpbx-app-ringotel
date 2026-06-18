@@ -582,6 +582,14 @@ class ringotel {
 		if ($content === false || $http_code !== 200) {
 			http_response_code(502);
 			echo 'Unable to retrieve log file from Ringotel (HTTP ' . intval($http_code) . ').';
+			// DIAGNOSTIC (temporary): expose the resolved log entry + upstream
+			// response so we can see the real url shape and what 401 returns.
+			echo "\n\n---- DIAGNOSTIC (temporary) ----";
+			echo "\nentry: " . json_encode($target);
+			echo "\nfetched_url_host: " . parse_url((string) $target['url'], PHP_URL_HOST);
+			echo "\nupstream_http_code: " . intval($http_code);
+			echo "\nupstream_content_type: " . $content_type;
+			echo "\nupstream_body_snippet: " . substr((string) $content, 0, 400);
 			return;
 		}
 
@@ -589,6 +597,11 @@ class ringotel {
 		if (stripos($content_type, 'text/html') !== false || stripos(ltrim((string) $content), '<!doctype html') === 0) {
 			http_response_code(502);
 			echo 'Unable to retrieve log file (the request to Ringotel was not authorized for this file).';
+			// DIAGNOSTIC (temporary)
+			echo "\n\n---- DIAGNOSTIC (temporary) ----";
+			echo "\nentry: " . json_encode($target);
+			echo "\nfetched_url_host: " . parse_url((string) $target['url'], PHP_URL_HOST);
+			echo "\nupstream_content_type: " . $content_type;
 			return;
 		}
 
