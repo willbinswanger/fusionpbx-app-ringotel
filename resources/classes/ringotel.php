@@ -558,33 +558,29 @@ class ringotel {
 			return;
 		}
 
-		// Per the Ringotel API (getLogFile), a log file is downloaded from the admin API
-		// host - <api>/userlogs/<domain>/<file> - authenticated with the same Bearer token
-		// as every other call. The url returned by getUserLogs points at the raw storage
-		// node (e.g. https://<ip>/userlogs/...), which does NOT accept the Bearer header
-		// (bare 401), so route the request through the API host. As a fallback the raw
-		// node does accept the token as a query parameter.
+		// getUserLogs returns the file's url on Ringotel's storage node
+		// (e.g. https://<ip>/userlogs/<domain>/<file>). That node serves the file when the
+		// API token is supplied as a query parameter (it rejects the Bearer header with a
+		// bare 401). NB: do NOT route this through the API host - a GET to the API base
+		// returns account/webhook config, not the file - so download from the url itself.
 		$token = (string) $this->settings->get('ringotel', 'ringotel_token', null);
 		$raw_url = (string) $target['url'];
-		$path = (string) parse_url($raw_url, PHP_URL_PATH); // /userlogs/<domain>/<file>
-		$api_base = rtrim((string) $this->settings->get('ringotel', 'ringotel_api', ''), '/');
 		$sep = (strpos($raw_url, '?') === false) ? '?' : '&';
 
-		$attempts = array();
-		if ($api_base !== '' && $path !== '') {
-			$attempts[] = array('url' => $api_base . $path, 'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token));
-		}
-		$attempts[] = array('url' => $raw_url . $sep . 'token=' . urlencode($token), 'headers' => array('Accept: text/plain'));
+		$attempts = array(
+			$raw_url . $sep . 'token=' . urlencode($token),
+			$raw_url . $sep . 'access_token=' . urlencode($token),
+		);
 
 		$content = false;
-		foreach ($attempts as $attempt) {
-			$ch = curl_init($attempt['url']);
+		foreach ($attempts as $attempt_url) {
+			$ch = curl_init($attempt_url);
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // raw log node presents a bare-IP / self-signed cert
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // storage node presents a bare-IP / self-signed cert
 			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $attempt['headers']);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: text/plain'));
 			$body = curl_exec($ch);
 			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 			curl_close($ch);
