@@ -558,48 +558,43 @@ class ringotel {
 			return;
 		}
 
-		// DIAGNOSTIC (temporary): probe every candidate download endpoint and report what
-		// each returns so we can pick the one that serves the real log file.
+		// Download the file from the storage-node url returned by getUserLogs, using the
+		// same Admin-API Bearer token as every other call (this is the documented getLogFile
+		// flow and is what worked originally). The token must NOT be passed as a query
+		// parameter - the node ignores that and serves its login SPA (HTTP 200 + HTML).
 		$token = (string) $this->settings->get('ringotel', 'ringotel_token', null);
-		$raw_url = (string) $target['url'];
-		$path = (string) parse_url($raw_url, PHP_URL_PATH);
-		$api_base = rtrim((string) $this->settings->get('ringotel', 'ringotel_api', ''), '/');
-		$sep = (strpos($raw_url, '?') === false) ? '?' : '&';
+		$url = (string) $target['url'];
+		$host = (string) parse_url($url, PHP_URL_HOST);
 
-		$candidates = array(
-			'api_host_bearer'    => array('url' => ($api_base !== '' && $path !== '' ? $api_base . $path : ''), 'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
-			'raw_bearer'         => array('url' => $raw_url,                                            'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
-			'raw_token_q'        => array('url' => $raw_url . $sep . 'token=' . urlencode($token),       'headers' => array('Accept: text/plain')),
-			'raw_access_token_q' => array('url' => $raw_url . $sep . 'access_token=' . urlencode($token), 'headers' => array('Accept: text/plain')),
-		);
+		$ch = curl_init($url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // storage node presents a bare-IP / self-signed cert
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: text/plain', 'Authorization: Bearer ' . $token));
+		$body = curl_exec($ch);
+		$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
 
-		http_response_code(502);
-		echo "DIAGNOSTIC (temporary): user log download candidates\n";
-		echo "api_base=" . $api_base . "\n";
-		echo "path=" . $path . "\n\n";
-		foreach ($candidates as $label => $c) {
-			if ($c['url'] === '') {
-				echo $label . ": (skipped - no api_base/path)\n\n";
-				continue;
-			}
-			$ch = curl_init($c['url']);
-			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $c['headers']);
-			$body = curl_exec($ch);
-			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-			$ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-			$eff_host = (string) parse_url((string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL), PHP_URL_HOST);
-			curl_close($ch);
-			$snippet = substr(preg_replace('/\s+/', ' ', (string) $body), 0, 160);
-			echo $label . ":\n";
-			echo "  code=" . $code . " ctype=" . $ctype . " len=" . strlen((string) $body) . " final_host=" . $eff_host . "\n";
-			echo "  snippet=" . $snippet . "\n\n";
+		// The node serves a login SPA (HTML) when it does not accept the request, so guard
+		// against streaming that as if it were the log.
+		$ltrimmed = ltrim((string) $body);
+		$is_html = (stripos($ltrimmed, '<!doctype html') === 0 || stripos($ltrimmed, '<html') === 0);
+
+		if ($body === false || $body === '' || $code !== 200 || $is_html) {
+			http_response_code(502);
+			echo 'Unable to retrieve the log file: Ringotel\'s log storage node (' . $host . ') returned HTTP ' . $code . ($is_html ? ' with a login page instead of the file' : '') . '. ';
+			echo 'This node also serves the Ringotel admin portal\'s log downloads, so a failure here is an upstream Ringotel issue rather than a FusionPBX one.';
+			return;
 		}
-		return;
+
+		// Stream the file to the browser as a download
+		$download_name = basename($name);
+		header('Content-Type: text/plain');
+		header('Content-Disposition: attachment; filename="' . $download_name . '"');
+		header('Content-Length: ' . strlen($body));
+		echo $body;
 	}
 
 	/**
