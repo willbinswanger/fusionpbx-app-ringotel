@@ -558,55 +558,48 @@ class ringotel {
 			return;
 		}
 
-		// getUserLogs returns the file's url on Ringotel's storage node
-		// (e.g. https://<ip>/userlogs/<domain>/<file>). That node serves the file when the
-		// API token is supplied as a query parameter (it rejects the Bearer header with a
-		// bare 401). NB: do NOT route this through the API host - a GET to the API base
-		// returns account/webhook config, not the file - so download from the url itself.
+		// DIAGNOSTIC (temporary): probe every candidate download endpoint and report what
+		// each returns so we can pick the one that serves the real log file.
 		$token = (string) $this->settings->get('ringotel', 'ringotel_token', null);
 		$raw_url = (string) $target['url'];
+		$path = (string) parse_url($raw_url, PHP_URL_PATH);
+		$api_base = rtrim((string) $this->settings->get('ringotel', 'ringotel_api', ''), '/');
 		$sep = (strpos($raw_url, '?') === false) ? '?' : '&';
 
-		$attempts = array(
-			$raw_url . $sep . 'token=' . urlencode($token),
-			$raw_url . $sep . 'access_token=' . urlencode($token),
+		$candidates = array(
+			'api_host_bearer'    => array('url' => ($api_base !== '' && $path !== '' ? $api_base . $path : ''), 'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
+			'raw_bearer'         => array('url' => $raw_url,                                            'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
+			'raw_token_q'        => array('url' => $raw_url . $sep . 'token=' . urlencode($token),       'headers' => array('Accept: text/plain')),
+			'raw_access_token_q' => array('url' => $raw_url . $sep . 'access_token=' . urlencode($token), 'headers' => array('Accept: text/plain')),
 		);
 
-		$content = false;
-		foreach ($attempts as $attempt_url) {
-			$ch = curl_init($attempt_url);
+		http_response_code(502);
+		echo "DIAGNOSTIC (temporary): user log download candidates\n";
+		echo "api_base=" . $api_base . "\n";
+		echo "path=" . $path . "\n\n";
+		foreach ($candidates as $label => $c) {
+			if ($c['url'] === '') {
+				echo $label . ": (skipped - no api_base/path)\n\n";
+				continue;
+			}
+			$ch = curl_init($c['url']);
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // storage node presents a bare-IP / self-signed cert
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: text/plain'));
+			curl_setopt($ch, CURLOPT_HTTPHEADER, $c['headers']);
 			$body = curl_exec($ch);
 			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+			$ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+			$eff_host = (string) parse_url((string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL), PHP_URL_HOST);
 			curl_close($ch);
-
-			// Reject only an actual HTML document (the unauthenticated admin SPA fallback).
-			// Do NOT reject by content-type: the node serves .txt logs as text/html.
-			$ltrimmed = ltrim((string) $body);
-			$looks_like_spa = (stripos($ltrimmed, '<!doctype html') === 0 || stripos($ltrimmed, '<html') === 0);
-			if ($body !== false && $body !== '' && $code === 200 && !$looks_like_spa) {
-				$content = $body;
-				break;
-			}
+			$snippet = substr(preg_replace('/\s+/', ' ', (string) $body), 0, 160);
+			echo $label . ":\n";
+			echo "  code=" . $code . " ctype=" . $ctype . " len=" . strlen((string) $body) . " final_host=" . $eff_host . "\n";
+			echo "  snippet=" . $snippet . "\n\n";
 		}
-
-		if ($content === false) {
-			http_response_code(502);
-			echo 'Unable to retrieve log file from Ringotel.';
-			return;
-		}
-
-		// Stream the file to the browser as a download
-		$download_name = basename($name);
-		header('Content-Type: text/plain');
-		header('Content-Disposition: attachment; filename="' . $download_name . '"');
-		header('Content-Length: ' . strlen($content));
-		echo $content;
+		return;
 	}
 
 	/**
