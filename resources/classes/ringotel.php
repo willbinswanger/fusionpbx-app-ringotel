@@ -558,48 +558,73 @@ class ringotel {
 			return;
 		}
 
-		// DIAGNOSTIC (temporary): probe every candidate download endpoint and report what
-		// each returns so we can pick the one that serves the real log file.
-		$token = (string) $this->settings->get('ringotel', 'ringotel_token', null);
-		$raw_url = (string) $target['url'];
-		$path = (string) parse_url($raw_url, PHP_URL_PATH);
-		$api_base = rtrim((string) $this->settings->get('ringotel', 'ringotel_api', ''), '/');
-		$sep = (strpos($raw_url, '?') === false) ? '?' : '&';
+		// Per Ringotel support, log files are no longer downloadable with the API Bearer
+		// token; they are served with Basic Authorization (the admin portal login) from the
+		// shell host itself - i.e. https://shell.ringotel.co/userlogs/<domain>/<file>, not
+		// shell.ringotel.co/api and not the raw storage node from the getUserLogs url.
+		$username = (string) $this->settings->get('ringotel', 'ringotel_portal_username', '');
+		$password = (string) $this->settings->get('ringotel', 'ringotel_portal_password', '');
+		if ($username === '' || $password === '') {
+			http_response_code(500);
+			echo 'Log downloads require the Ringotel admin portal login. Set ringotel_portal_username and ringotel_portal_password (category: ringotel) in Advanced > Default Settings.';
+			return;
+		}
 
-		$candidates = array(
-			'api_host_bearer'    => array('url' => ($api_base !== '' && $path !== '' ? $api_base . $path : ''), 'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
-			'raw_bearer'         => array('url' => $raw_url,                                            'headers' => array('Accept: text/plain', 'Authorization: Bearer ' . $token)),
-			'raw_token_q'        => array('url' => $raw_url . $sep . 'token=' . urlencode($token),       'headers' => array('Accept: text/plain')),
-			'raw_access_token_q' => array('url' => $raw_url . $sep . 'access_token=' . urlencode($token), 'headers' => array('Accept: text/plain')),
-		);
+		// Shell origin = the API base without its /api path (e.g. https://shell.ringotel.co)
+		$api_base = (string) $this->settings->get('ringotel', 'ringotel_api', '');
+		$scheme = parse_url($api_base, PHP_URL_SCHEME) ?: 'https';
+		$shell_host = (string) parse_url($api_base, PHP_URL_HOST);
+		$path = (string) parse_url((string) $target['url'], PHP_URL_PATH); // /userlogs/<domain>/<file>
 
-		http_response_code(502);
-		echo "DIAGNOSTIC (temporary): user log download candidates\n";
-		echo "api_base=" . $api_base . "\n";
-		echo "path=" . $path . "\n\n";
-		foreach ($candidates as $label => $c) {
-			if ($c['url'] === '') {
-				echo $label . ": (skipped - no api_base/path)\n\n";
-				continue;
-			}
-			$ch = curl_init($c['url']);
+		// Prefer the shell host (Ringotel's stated method); fall back to the storage-node
+		// url from getUserLogs with the same Basic credentials.
+		$attempts = array();
+		if ($shell_host !== '' && $path !== '') {
+			$attempts[] = $scheme . '://' . $shell_host . $path;
+		}
+		$attempts[] = (string) $target['url'];
+
+		$content = false;
+		$statuses = array();
+		foreach ($attempts as $attempt_url) {
+			$ch = curl_init($attempt_url);
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // storage node presents a bare-IP / self-signed cert
 			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $c['headers']);
+			curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+			curl_setopt($ch, CURLOPT_USERPWD, $username . ':' . $password);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: text/plain'));
 			$body = curl_exec($ch);
 			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-			$ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-			$eff_host = (string) parse_url((string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL), PHP_URL_HOST);
 			curl_close($ch);
-			$snippet = substr(preg_replace('/\s+/', ' ', (string) $body), 0, 160);
-			echo $label . ":\n";
-			echo "  code=" . $code . " ctype=" . $ctype . " len=" . strlen((string) $body) . " final_host=" . $eff_host . "\n";
-			echo "  snippet=" . $snippet . "\n\n";
+
+			// An unauthenticated request gets the login SPA (HTTP 200 + HTML); never stream
+			// that as if it were the log.
+			$ltrimmed = ltrim((string) $body);
+			$is_html = (stripos($ltrimmed, '<!doctype html') === 0 || stripos($ltrimmed, '<html') === 0);
+			$statuses[] = parse_url($attempt_url, PHP_URL_HOST) . '=' . $code . ($is_html ? ' (login page)' : '');
+
+			if ($body !== false && $body !== '' && $code === 200 && !$is_html) {
+				$content = $body;
+				break;
+			}
 		}
-		return;
+
+		if ($content === false) {
+			http_response_code(502);
+			echo 'Unable to retrieve the log file from Ringotel (' . implode(', ', $statuses) . '). ';
+			echo 'A 401 or a login page means the ringotel_portal_username / ringotel_portal_password default settings do not match the shell.ringotel.co admin portal login.';
+			return;
+		}
+
+		// Stream the file to the browser as a download
+		$download_name = basename($name);
+		header('Content-Type: text/plain');
+		header('Content-Disposition: attachment; filename="' . $download_name . '"');
+		header('Content-Length: ' . strlen($content));
+		echo $content;
 	}
 
 	/**
